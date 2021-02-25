@@ -334,7 +334,7 @@ func (r *Reflector) reflectStructFields(st *Type, definitions Definitions, t ref
 		return
 	}
 
-	handleField := func (f reflect.StructField) {
+	handleField := func(f reflect.StructField) {
 		name, shouldEmbed, required, nullable := r.reflectFieldName(f)
 		// if anonymous and exported type should be processed recursively
 		// current type should inherit properties of anonymous one
@@ -379,7 +379,11 @@ func (r *Reflector) reflectStructFields(st *Type, definitions Definitions, t ref
 }
 
 func (t *Type) structKeywordsFromTags(f reflect.StructField, parentType *Type, propertyName string) {
-	t.Description = f.Tag.Get("jsonschema_description")
+	if f.Tag.Get("description") != "" {
+		t.Description = f.Tag.Get("description")
+	} else {
+		t.Description = f.Tag.Get("jsonschema_description")
+	}
 	tags := strings.Split(f.Tag.Get("jsonschema"), ",")
 	t.genericKeywords(tags, parentType, propertyName)
 	switch t.Type {
@@ -712,6 +716,29 @@ func (s *Schema) MarshalJSON() ([]byte, error) {
 	d, err := json.Marshal(struct {
 		Definitions Definitions `json:"definitions,omitempty"`
 	}{s.Definitions})
+	if err != nil {
+		return nil, err
+	}
+	if len(b) == 2 {
+		return d, nil
+	} else {
+		b[len(b)-1] = ','
+		return append(b, d[1:]...), nil
+	}
+}
+
+func (s *Schema) MarshalIndentJSON() ([]byte, error) {
+	const indent = "  "
+	b, err := json.MarshalIndent(s.Type, "", indent)
+	if err != nil {
+		return nil, err
+	}
+	if s.Definitions == nil || len(s.Definitions) == 0 {
+		return b, nil
+	}
+	d, err := json.MarshalIndent(struct {
+		Definitions Definitions `json:"definitions,omitempty"`
+	}{s.Definitions}, "", indent)
 	if err != nil {
 		return nil, err
 	}
